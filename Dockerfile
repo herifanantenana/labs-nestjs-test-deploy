@@ -1,34 +1,35 @@
-FROM node:22-alpine AS base
+# Étape 1 : installation et compilation
+FROM node:22-alpine AS builder
 
 WORKDIR /usr/src/app
 
-RUN corepack enable
-
-FROM base AS deps
+RUN corepack enable \
+    && corepack prepare pnpm@9.15.9 --activate
 
 COPY package.json pnpm-lock.yaml ./
 
-RUN corepack prepare pnpm@9 --activate && pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
-FROM base AS build
-
-COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY . .
 
-RUN corepack prepare pnpm@9 --activate && pnpm build
+RUN pnpm run build
 
+# Supprime les dépendances de développement
+RUN pnpm prune --prod
+
+
+# Étape 2 : image de production
 FROM node:22-alpine AS production
-
-ENV NODE_ENV=production
 
 WORKDIR /usr/src/app
 
-COPY package.json pnpm-lock.yaml ./
+ENV NODE_ENV=production
+ENV PORT=8080
 
-RUN corepack enable && corepack prepare pnpm@9 --activate && pnpm install --frozen-lockfile --prod
+COPY --from=builder /usr/src/app/package.json ./package.json
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/dist ./dist
 
-COPY --from=build /usr/src/app/dist ./dist
-
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["node", "dist/main.js"]
