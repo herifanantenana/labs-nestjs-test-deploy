@@ -14,4 +14,9 @@ export class AppController {
   getTestRun(): string {
     return 'Test Run';
   }
+
+  @Get('hello')
+  getHelloWorld(): { message: string } {
+    return { message: 'Hello World' };
+  }
 }
